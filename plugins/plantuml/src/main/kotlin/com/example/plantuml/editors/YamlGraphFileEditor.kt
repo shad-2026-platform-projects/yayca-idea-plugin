@@ -1,4 +1,4 @@
-package com.example.plantuml
+package com.example.plantuml.editors
 
 import com.example.plantuml.services.RenderService
 import com.intellij.openapi.application.ApplicationManager
@@ -14,8 +14,14 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.JBSplitter
 import java.awt.BorderLayout
 import java.awt.Dimension
+import java.awt.image.BufferedImage
 import java.beans.PropertyChangeListener
-import javax.swing.*
+import javax.swing.ImageIcon
+import javax.swing.JComponent
+import javax.swing.JLabel
+import javax.swing.JPanel
+import javax.swing.JScrollPane
+import javax.swing.SwingConstants
 
 class YamlGraphFileEditor(
     private val project: Project,
@@ -73,7 +79,7 @@ class YamlGraphFileEditor(
         renderService.scheduleRender(document.text)
     }
 
-    private fun updateUIImage(image: java.awt.image.BufferedImage) {
+    private fun updateUIImage(image: BufferedImage) {
         ApplicationManager.getApplication().invokeLater {
             imageLabel.icon = ImageIcon(image)
             imageLabel.text = null

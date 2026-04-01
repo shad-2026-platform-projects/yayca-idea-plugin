@@ -1,4 +1,4 @@
-package com.example.plantuml
+package com.example.plantuml.renderer
 
 import com.example.plantuml.settings.PlantUmlSettings
 import com.intellij.openapi.diagnostic.logger
@@ -9,7 +9,10 @@ import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
-import java.util.concurrent.*
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicReference
 import javax.imageio.ImageIO
 

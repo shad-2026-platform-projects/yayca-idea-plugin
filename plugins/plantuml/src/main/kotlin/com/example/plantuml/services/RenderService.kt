@@ -1,6 +1,6 @@
 package com.example.plantuml.services
 
-import com.example.plantuml.PlantUmlRenderer
+import com.example.plantuml.renderer.PlantUmlRenderer
 import java.util.concurrent.Executors
 import javax.swing.Timer
 
