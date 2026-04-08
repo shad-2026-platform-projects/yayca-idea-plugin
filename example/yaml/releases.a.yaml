@@ -1,0 +1,57 @@
+ci:
+  releases:
+
+    release-apps-v2:
+      title: 'Релиз приложений Еда/Деливери (CI)'
+      description: |
+
+      flow: release-flow
+      hotfix-flows:
+        - hotfix-flow
+
+      notifications:
+        - statuses:
+            - STARTING
+            - FAILURE
+            - WAITING_FOR_STAGE
+            - WAITING_FOR_SCHEDULE
+            - SUCCESS
+            - CANCELED
+
+      stages:
+        - id: prepare
+          title: 'Подготовка релиза'
+        - id: test
+          title: 'Тестирование релиза'
+          notifications:
+            stage-statuses:
+              - stage-acquired
+        - id: build
+          title: 'Сборка приложений для публикации'
+          notifications:
+            stage-statuses:
+              - stage-acquired
+        - id: publish
+          title: 'Публикация приложений'
+          notifications:
+            stage-statuses:
+              - stage-acquired
+        - id: finish
+          title: 'Завершение релиза'
+          notifications:
+            stage-statuses:
+              - stage-acquired
+      branches:
+        pattern: releases/mobileinfra/eats/android_client/AndroidClient_${major:yy}.${minor}.0
+        default-config-source: branch
+        auto-create: true
+        independent-stages: true
+
+      versions:
+        pattern: ${major:yy}.${minor}.${patch}
+        initial:
+          major: "26"
+          minor: 14
+        default-increment: minor
+      flow-vars:
+        release_train_env: PRODUCTION

@@ -1,0 +1,1921 @@
+jobs:
+  qa-build-job:
+    kill-timeout: 180m
+    input:
+      cmd:
+        - ./ci/scripts/checkout-branch-head.sh
+        - ./ci/scripts/qa-build-app.sh
+      env:
+        IS_PROTECTED: true
+
+  build-ui-tests-job:
+    title: Build UI-tests
+    kill-timeout: 90m
+    input:
+      cmd:
+        - ./ci/scripts/checkout-branch-head.sh
+        - python3 ./ci/scripts/find_and_download_nightly_mocks.py -p android -o eats/src/androidTest/assets/
+        - ./gradlew :app:assembleGoogleDebug :app:assembleGoogleDebugAndroidTest
+      artifacts:
+        +eats/src/androidTest/Marathon: Marathon
+      env:
+        IS_UI_TEST: true
+
+  run-ui-tests-job:
+    tags: pinned
+    kill-timeout: 120m
+    input:
+      app_url: ${tasks.build-ui-tests.output_params.artifacts_badge.url}/apk/eats/build/outputs/apk/google/debug/app-google-debug.apk
+      test_app_url: ${tasks.build-ui-tests.output_params.artifacts_badge.url}/apk/eats/build/outputs/apk/androidTest/google/debug/app-google-debug-androidTest.apk
+      marathonfile_url: ${tasks.build-ui-tests.output_params.artifacts_badge.url}/Marathon
+
+  prepare-test-lists:
+    title: Деление списка тестов на shard-ы
+    task: common/misc/run_command
+    kill-timeout: 10m
+    input:
+      config:
+        arc_mount_config:
+          enabled: true
+        cmd_line: |
+          cd $ARCADIA_PATH/taxi/mobile/eats/android_client
+          python3 ./ci/scripts/prepare_test_lists.py \
+            --source scan \
+            --no-flex
+          mkdir $RESULT_RESOURCES_PATH/test_lists
+          cp -r test_lists $RESULT_RESOURCES_PATH/test_lists
+        result_resources:
+          - description: Test packages
+            path: test_lists
+            type: OTHER_RESOURCE
+            ci_badge: true
+            optional: false
+            compression_type: none
+            attributes:
+              ttl: "3"
+
+  release-build-job:
+    kill-timeout: 240m
+    tags: pinned
+    input:
+      cmd:
+        - ./ci/scripts/checkout-branch-head.sh
+        - ./ci/scripts/release-build-app.sh
+        - python3 ./ci/scripts/createReleaseTrainMetadata.py
+        - python3 ./ci/scripts/parseVersionName.py
+      artifacts_attrs:
+        ttl: 60
+      artifacts:
+        +mmm-release-train: mmm-release-train
+      env:
+        IS_RELEASE: true
+
+  eats-release-build-job:
+    
+    input:
+      env:
+        APP_TYPE: app
+        WHATS_NEW_RU: ${tasks.get-whats-new-update.whats_new_ru || tasks.get-whats-new.whats_new_ru}
+        WHATS_NEW_EN: ${tasks.get-whats-new-update.whats_new_en || tasks.get-whats-new.whats_new_en}
+
+  delivery-release-build-job:
+    
+    input:
+      env:
+        APP_TYPE: md-app
+        WHATS_NEW_RU: ${tasks.get-whats-new-update.whats_new_ru || tasks.get-whats-new.whats_new_ru}
+        WHATS_NEW_EN: ${tasks.get-whats-new-update.whats_new_en || tasks.get-whats-new.whats_new_en}
+
+  update-counter-job:
+    task: projects/classifieds/mobile/build_counter_update
+    input:
+      config:
+
+  create-release-googleplay-job:
+    task: projects/taxi/mobile/infra/mmm/release-train/create/googleplay/production/release
+    version: stable
+    manual:
+      enabled: true
+      prompt: |
+
+        > ❗ После ревью нужно подтвердить публикацию вручную из консоли.
+
+  create-release-googleplay-beta-job:
+    
+    task: projects/taxi/mobile/infra/mmm/release-train/create/googleplay/beta/release
+
+  create-release-appgallery-job:
+    task: projects/taxi/mobile/infra/mmm/release-train/create/appgallery/release
+    version: stable
+    manual:
+      enabled: true
+      
+
+  create-release-rustore-job:
+    task: projects/taxi/mobile/infra/mmm/release-train/create/rustore/release
+    version: stable
+    manual:
+      enabled: true
+      
+
+  create-release-samsung-job:
+    task: common/mobile/mmm/release-train/create-release
+    version: stable
+    manual:
+      enabled: true
+      
+
+  googleplay-deploy-5:
+    task: projects/taxi/mobile/infra/mmm/release-train/move/googleplay/production/partial
+    version: stable
+    input:
+      status:
+        percent: "5"
+
+  googleplay-deploy-10:
+    task: projects/taxi/mobile/infra/mmm/release-train/move/googleplay/production/partial
+    version: stable
+    input:
+      status:
+        percent: "10"
+
+  googleplay-deploy-15:
+    task: projects/taxi/mobile/infra/mmm/release-train/move/googleplay/production/partial
+    version: stable
+    manual:
+      enabled: true
+      
+    input:
+      status:
+        percent: "15"
+
+  googleplay-deploy-25:
+    task: projects/taxi/mobile/infra/mmm/release-train/move/googleplay/production/partial
+    version: stable
+    manual:
+      enabled: true
+      
+    input:
+      status:
+        percent: "25"
+
+  googleplay-deploy-50:
+    task: projects/taxi/mobile/infra/mmm/release-train/move/googleplay/production/partial
+    version: stable
+    manual:
+      enabled: true
+      
+    input:
+      status:
+        percent: "50"
+
+  deploy-99:
+    version: stable
+    input:
+      status:
+        percent: "99"
+
+  deploy-100:
+    version: stable
+    manual:
+      enabled: true
+      
+
+  deploy-5:
+    task: common/mobile/mmm/release-train/move-release
+    version: stable
+    manual:
+      enabled: true
+      
+    input:
+      status_info:
+        status: IN_PROGRESS
+        percent: 5
+
+  deploy-10:
+    task: common/mobile/mmm/release-train/move-release
+    version: stable
+    manual:
+      enabled: true
+      
+    input:
+      status_info:
+        status: IN_PROGRESS
+        percent: 10
+
+  deploy-25:
+    task: common/mobile/mmm/release-train/move-release
+    version: stable
+    manual:
+      enabled: true
+      
+    input:
+      status_info:
+        status: IN_PROGRESS
+        percent: 25
+
+  deploy-50:
+    task: common/mobile/mmm/release-train/move-release
+    version: stable
+    manual:
+      enabled: true
+      
+    input:
+      status_info:
+        status: IN_PROGRESS
+        percent: 50
+
+  mmm-deploy-99:
+    task: common/mobile/mmm/release-train/move-release
+    version: stable
+    input:
+      status_info:
+        status: IN_PROGRESS
+        percent: 99
+
+  mmm-deploy-100:
+    task: common/mobile/mmm/release-train/move-release
+    version: stable
+    manual:
+      enabled: true
+      
+    input:
+      status_info:
+        status: COMPLETED
+
+  mmm-deploy-stop:
+    task: common/mobile/mmm/release-train/move-release
+    version: stable
+    input:
+      status_info:
+        status: HALTED
+
+  send-message-to-jns:
+    task: projects/eats/send_jns_message
+    input:
+      config:
+
+        jns_project: eats-mobile-android
+        jns_channel: eats-release-ci-notifications
+
+        jns_template: release
+
+  get-whats-new-job:
+    title: Get "What's new"
+    description: Получение текстов "Что нового" для релиза в сторы
+    task: projects/eats/whats_new
+    runtime:
+      tasklet:
+        account_name: /root/sandbox/generic/linux
+    input:
+      config:
+        project: android
+        version: ${tasks.start-preparing.values.current_version_minor}
+
+        table_id: fc9c658f-5b5b-4a5e-a375-8819d571ba07
+        table_id_default: b78b7ba7-7f06-43f8-9675-f4d97a39c482
+        whats_new_ru_fallback: "Вам доставка нового обновления: в новой версии пофиксили баги и улучшили производительность. А чтобы приехала доставка еды, закажите у нас"
+        whats_new_en_fallback: "Here's your update delivery: bugs have been fixed in the new version and performance has been improved. And to get a food delivery, just order with us"
+ci:
+  flows:
+    release-flow:
+      title: Release flow
+      jobs:
+
+        start-preparing:
+          stage: prepare
+          title: Prepare release
+          description: Подготовка данных для релиза
+          input:
+            exec:
+              mode: EXEC_MODE_FAIL_FAST
+              commands:
+                - shell:
+                    script: |
+                      python3 ./ci/scripts/release-parse-versions.py \ 
+                      -app-type eatsVersion \ 
+                      > $CI_RESULTS_FILE
+
+        get-whats-new: &get-whats-new
+          stage: prepare
+          needs: start-preparing
+          
+
+        find-release-ticket:
+          stage: prepare
+          needs: start-preparing
+          title: Find release ticket
+          task: common/tracker/find_issue
+          input:
+            config:
+            filter:
+              query: 'Queue: EDAFRONT Components: AndroidClient Type: release Summary:
+
+        start-release-ticket: &start-release-ticket
+          stage: prepare
+          needs:
+            - get-whats-new
+            - find-release-ticket
+          title: Start release ticket
+          description: Взять релизный тикет в работу и призвать дежурного
+          task: common/tracker/transit_issue
+          input:
+            issue: ${tasks.find-release-ticket.issue}
+            config:
+              link:
+                ignore_commits: true
+            transition:
+              status: В работе
+            update_template:
+              comment: |
+                Запущен [${context.title}](${context.ci_url}) в ${date_format(context.flow_started_at, 'dd.MM.yyyy HH:mm', 'Europe/Moscow')}
+
+                Описание релиза для стора:
+                [Источник what's new](https://nda.ya.ru/t/nAgsfPb_7C4aPG)
+
+                ${tasks.get-whats-new.whats_new_ru}
+                ||||
+                ${tasks.get-whats-new.whats_new_en}
+                |||
+              duty:
+                schedule:
+                  slug: eda_android_releases
+                is_assignee: true
+                is_summonee: true
+
+        create-next-release-ticket:
+          stage: prepare
+          needs: start-preparing
+          title: Create next release ticket
+          task: common/tracker/create_issue
+          input:
+            config:
+              link:
+                ignore_commits: true
+            rules:
+
+              on_duplicate: FAIL
+            template:
+              queue: EDAFRONT
+              type: Релиз
+              summary: Release Eats AndroidClient_${tasks.start-preparing.values.next_version_full}
+              description: |
+                **Релиз в Arcadia CI:**
+                [Release Flow](https://a.yandex-team.ru/projects/yeats_android_development_team/ci/releases/flow?dir=taxi%2Fmobile%2Feats%2Fandroid_client&id=release-apps&version=${tasks.start-preparing.values.next_version_full})
+
+                **Сборки в Бета:**
+                - [QA Debug Еда](https://beta.m.soft.yandex.ru/description?app=eda&platform_shortcut=android&branch=release_AndroidClient_${tasks.start-preparing.values.next_version_beta}_Debug_Google)
+                - [QA Release Еда](https://beta.m.soft.yandex.ru/description?app=eda&platform_shortcut=android&branch=release_AndroidClient_${tasks.start-preparing.values.next_version_beta}_Release_Google)
+                - [QA Debug Деливери](https://beta.m.soft.yandex.ru/description?app=MarketDelivery&platform_shortcut=android&branch=release_AndroidClient_${tasks.start-preparing.values.next_version_beta}_Debug_Google)
+                - [QA Release Деливери](https://beta.m.soft.yandex.ru/description?app=MarketDelivery&platform_shortcut=android&branch=release_AndroidClient_${tasks.start-preparing.values.next_version_beta}_Release_Google)
+
+                ---
+                **Задачи в релизе:**
+
+              components: [AndroidClient]
+              fix_version: AndroidClient_${tasks.start-preparing.values.next_version_full}
+
+        create-update-version-pr:
+          stage: prepare
+          needs: create-next-release-ticket
+          title: Create bump minor version PR
+          task: projects/eats/eats_increase_app_version
+          input:
+            config:
+              project: android
+
+              increaseType: MINOR
+              branch: trunk
+              linkIssue: ${tasks.create-next-release-ticket.issue.issue}
+              forceMerge: true
+              appVersions: [eatsVersion]
+
+        switch-version-job:
+          stage: prepare
+          needs: find-release-ticket
+          title: Switch Version Job
+          task: projects/mobile/infra/switch_versions
+          input:
+            config:
+              queue: EDAFRONT
+              version_pattern: AndroidClient_.*
+              description: Релизный тикет - ${tasks.find-release-ticket.issue.issue}
+
+        report-release-started:
+          stage: prepare
+          needs:
+            - create-next-release-ticket
+            - create-update-version-pr
+            - start-release-ticket
+            - switch-version-job
+          
+          title: Report release started
+          description: Отправка сообщения о начале релиза в JNS
+          input:
+            config:
+              jns_message: |
+                Запущен <a href="${context.ci_url}">${context.title}</a> в ${date_format(context.flow_started_at, 'dd.MM.yyyy HH:mm', 'Europe/Moscow')}
+
+                <a href="https://nda.ya.ru/t/4NJYMwql7Hd77H">Инструкция дежурного по релизу</a>
+
+                <a href="https://st.yandex-team.ru/${tasks.find-release-ticket.issue.issue}">Релизный тикет</a> взят в работу.
+
+                Release notes для стора: <a href="https://nda.ya.ru/t/nAgsfPb_7C4aPG">Источник what's new</a>
+                <pre>${tasks.get-whats-new.whats_new_ru}</pre>
+                <pre>${tasks.get-whats-new.whats_new_en}</pre>
+
+                Создан тикет для следующего релиза: <a href="https://st.yandex-team.ru/${tasks.create-next-release-ticket.issue.issue}">${tasks.create-next-release-ticket.issue.issue}</a>
+
+                ${tasks.create-update-version-pr.report.response}
+                ${tasks.switch-version-job.report.response}
+
+        start-beta-publishing:
+          stage: test
+          needs: start-testing
+          title: Start GooglePlay Beta Publishing
+          task: dummy
+          manual:
+            enabled: true
+            prompt: |
+
+              > ❗ После ревью нужно подтвердить публикацию вручную из консоли.
+
+              > ❗ Перевыкатывать релиз через Release Train нельзя .
+              Если потребуется перевыкатить сборку в Beta после исправлений в релизной ветке, придется публиковать вручную через GP консоль
+
+        update-eats-beta-counter:
+          stage: test
+          needs: start-beta-publishing
+          title: Update Eats Counter
+          
+          input:
+            config:
+
+              counter_name: "mobile_infra_quota:eats/eats_android_release_counter"
+
+        build-eats-beta-release:
+          stage: test
+          needs: update-eats-beta-counter
+          
+          title: Eats Google Beta Release Build
+          input:
+            env:
+              FLAVOR: Google
+              IS_GOOGLE_BETA: true
+              BUILD_NUMBER: ${tasks.update-eats-beta-counter.build_number.value}
+
+        eats-release-googleplay-beta:
+          stage: test
+          needs: build-eats-beta-release
+          
+          title: Eats GooglePlay Beta Release
+          input:
+            release_files:
+              resource_id: ${tasks.build-eats-beta-release.resources[?type == 'TEAMCITY_ARTIFACTS'].id | single(@)}
+            app_id:
+              value: ${tasks.build-eats-beta-release.output_params.values.app_id}
+            version:
+              value: ${tasks.build-eats-beta-release.output_params.values.version}
+            version_name:
+              value: ${tasks.build-eats-beta-release.output_params.values.version_name}
+          manual:
+            enabled: false
+
+        eats-beta-deploy:
+          stage: test
+          needs: eats-release-googleplay-beta
+          
+          task: projects/taxi/mobile/infra/mmm/release-train/move/googleplay/beta/completed
+          title: Eats GooglePlay Beta 100%
+          manual:
+            enabled: false
+
+        update-delivery-beta-counter:
+          stage: test
+          needs: start-beta-publishing
+          title: Update Delivery Counter
+
+        build-delivery-beta-release:
+          stage: test
+          needs: update-delivery-beta-counter
+          
+          title: Delivery Google Beta Release Build
+          input:
+            env:
+              FLAVOR: Google
+              IS_GOOGLE_BETA: true
+              BUILD_NUMBER: ${tasks.update-delivery-beta-counter.build_number.value}
+
+        delivery-release-googleplay-beta:
+          stage: test
+          needs: build-delivery-beta-release
+          
+          title: Delivery GooglePlay Beta Release
+          input:
+            release_files:
+              resource_id: ${tasks.build-delivery-beta-release.resources[?type == 'TEAMCITY_ARTIFACTS'].id | single(@)}
+            app_id:
+              value: ${tasks.build-delivery-beta-release.output_params.values.app_id}
+            version:
+              value: ${tasks.build-delivery-beta-release.output_params.values.version}
+            version_name:
+              value: ${tasks.build-delivery-beta-release.output_params.values.version_name}
+          manual:
+            enabled: false
+
+        delivery-beta-deploy:
+          stage: test
+          needs: delivery-release-googleplay-beta
+          
+          task: projects/taxi/mobile/infra/mmm/release-train/move/googleplay/beta/completed
+          title: Delivery GooglePlay Beta 100%
+          manual:
+            enabled: false
+
+        start-testing: &start-testing
+          stage: test
+          needs: report-release-started
+          title: Testing started
+          task: dummy
+
+        start-regress-builds: &start-regress-builds
+          stage: test
+          needs: start-testing
+          title: Start regress builds
+          task: dummy
+
+        build-ui-tests: &build-ui-tests
+          stage: test
+          needs: start-regress-builds
+          
+
+        prepare-test-lists: &prepare-test-lists
+          stage: test
+          needs: start-regress-builds
+          
+
+        run-ui-tests-shard-1: &run-ui-tests-shard-1
+          stage: test
+          needs: [ build-ui-tests, prepare-test-lists ]
+          
+          title: Run UI-tests (Shard 1/3)
+          input:
+            test_lists: ${tasks.prepare-test-lists.resources[?type == 'OTHER_RESOURCE'].id}
+            allowlist_config:
+              - type: fully-qualified-class-name
+                file: test_list_1.txt
+
+        run-ui-tests-shard-2: &run-ui-tests-shard-2
+          stage: test
+          needs: [ build-ui-tests, prepare-test-lists ]
+          
+          title: Run UI-tests (Shard 2/3)
+          input:
+            test_lists: ${tasks.prepare-test-lists.resources[?type == 'OTHER_RESOURCE'].id}
+            allowlist_config:
+              - type: fully-qualified-class-name
+                file: test_list_2.txt
+
+        run-ui-tests-shard-3: &run-ui-tests-shard-3
+          stage: test
+          needs: [ build-ui-tests, prepare-test-lists ]
+          
+          title: Run UI-tests (Shard 3/3)
+          input:
+            test_lists: ${tasks.prepare-test-lists.resources[?type == 'OTHER_RESOURCE'].id}
+            allowlist_config:
+              - type: fully-qualified-class-name
+                file: test_list_3.txt
+
+        run-ui-tests-flex: &run-ui-tests-flex
+          stage: test
+          needs: build-ui-tests
+          
+          title: Run Flex UI-tests
+          input:
+            allowlist_config:
+              - type: package
+                regex: ru.foodfox.client.tests.flex.*
+
+        merge-allure-results: &merge-allure-results
+          stage: test
+          needs:
+            - run-ui-tests-shard-1
+            - run-ui-tests-shard-2
+            - run-ui-tests-shard-3
+          input:
+            cmd:
+              - mkdir shard-1 shard-2 shard-3
+
+              - curl '${tasks.run-ui-tests-shard-1.output_params.artifacts_badge.url}/marathon?stream=tgz' | tar xz -C shard-1 --strip-components 1
+              - curl '${tasks.run-ui-tests-shard-2.output_params.artifacts_badge.url}/marathon?stream=tgz' | tar xz -C shard-2 --strip-components 1
+              - curl '${tasks.run-ui-tests-shard-3.output_params.artifacts_badge.url}/marathon?stream=tgz' | tar xz -C shard-3 --strip-components 1
+              - python3 taxi/mobile/eats/android_client/ci/scripts/merge-allure-keep-retries.py merged-results shard-1 shard-2 shard-3
+              - allure generate merged-results -o allure-report
+              - zip -rq report.zip allure-report
+
+        merge-flex-allure-results: &merge-flex-allure-results
+          stage: test
+          needs:
+            - run-ui-tests-flex
+          title: Merge Flex Allure Reports
+          input:
+            cmd:
+              - mkdir flex-marathon
+
+              - curl '${tasks.run-ui-tests-flex.output_params.artifacts_badge.url}/marathon?stream=tgz' | tar xz -C flex-marathon --strip-components 1
+              - python3 taxi/mobile/eats/android_client/ci/scripts/merge-allure-keep-retries.py merged-results flex-marathon
+              - allure generate merged-results -o allure-report
+              - zip -rq report.zip allure-report
+
+        ai-test-failure-native-analyzer: &ai-test-failure-native-analyzer
+          stage: test
+          needs:
+            - merge-allure-results
+          title: Export Native to TMS + AI analyzer
+          input:
+            request:
+              allure_report:
+                allure_id: "${tasks.merge-allure-results.resources[?type == 'TEAMCITY_ARTIFACTS'].id | single(@)}"
+                ticket: "${tasks.find-release-ticket.issue.issue}"
+                project_configs: [
+                  { "project": "yandex_eats", "test_plan": 72 },
+                  { "project": "newbiz", "test_plan": 26 }
+                ]
+                platform: android
+
+        ai-test-failure-flex-analyzer: &ai-test-failure-flex-analyzer
+          stage: test
+          needs:
+            - merge-flex-allure-results
+          title: Export Flex to TMS + AI analyzer
+          input:
+            request:
+              allure_report:
+                allure_id: "${tasks.merge-flex-allure-results.resources[?type == 'TEAMCITY_ARTIFACTS'].id | single(@)}"
+                ticket: "${tasks.find-release-ticket.issue.issue}"
+                project_configs: [
+                  { "project": "yandex_eats", "test_plan": 77 }
+                ]
+                platform: android
+
+        eats-google-debug-qa-build: &eats-google-debug-qa-build
+          stage: test
+          needs: start-regress-builds
+          
+          title: QA Eats Google Debug
+          description: Google Debug сборка приложения Eats и загрузка в Y.Beta
+          input:
+            env:
+              FLAVOR: Google
+              BUILD_NAME: QA Debug Google
+              APP_NAME: Eats
+              APP_BUILD_TYPE: DebugMinified
+
+        eats-google-release-qa-build: &eats-google-release-qa-build
+          stage: test
+          needs: start-regress-builds
+          
+          title: QA Eats Google Release
+          description: Google Release сборка приложения Eats и загрузка в Y.Beta
+          input:
+            env:
+              FLAVOR: Google
+              BUILD_NAME: QA Release Google
+              APP_NAME: Eats
+              APP_BUILD_TYPE: Release
+
+        delivery-google-debug-qa-build: &delivery-google-debug-qa-build
+          stage: test
+          needs: start-regress-builds
+          
+          title: QA Delivery Google Debug
+          description: Google Debug сборка приложения Delivery и загрузка в Y.Beta
+          input:
+            env:
+              FLAVOR: Google
+              BUILD_NAME: QA Debug Google
+              APP_NAME: Delivery
+              APP_BUILD_TYPE: DebugMinified
+
+        delivery-google-release-qa-build: &delivery-google-release-qa-build
+          stage: test
+          needs: start-regress-builds
+          
+          title: QA Delivery Google Release
+          description: Google Release сборка приложения Delivery и загрузка в Y.Beta
+          input:
+            env:
+              FLAVOR: Google
+              BUILD_NAME: QA Release Google
+              APP_NAME: Delivery
+              APP_BUILD_TYPE: Release
+
+        report-debug-qa-builds-finished: &report-debug-qa-builds-finished
+          stage: test
+          needs:
+            - eats-google-debug-qa-build
+            - delivery-google-debug-qa-build
+          
+          title: Report Debug QA builds finished
+          description: Отправка сообщения в JNS о завершении Debug QA сборок
+          input:
+            config:
+              jns_message: |
+                <a href="${context.ci_url}">${context.title}</a>
+
+                QA Debug сборки готовы.
+                - <a href="${tasks.eats-google-debug-qa-build.output_params.values.beta-link}">Eats Debug</a>
+                - <a href="${tasks.delivery-google-debug-qa-build.output_params.values.beta-link}">Delivery Debug</a>
+
+                Изменения в релизной ветке:
+                ${tasks.eats-google-debug-qa-build.output_params.values.branch_changelog}
+
+        report-release-qa-builds-finished: &report-release-qa-builds-finished
+          stage: test
+          needs:
+            - eats-google-release-qa-build
+            - delivery-google-release-qa-build
+          
+          title: Report Release QA builds finished
+          description: Отправка сообщения в JNS о завершении QA сборок
+          input:
+            config:
+              jns_message: |
+                <a href="${context.ci_url}">${context.title}</a>
+
+                QA Release сборки завершены.
+                - <a href="${tasks.eats-google-release-qa-build.output_params.values.beta-link}">Eats Release</a>
+                - <a href="${tasks.delivery-google-release-qa-build.output_params.values.beta-link}">Delivery Release</a>
+
+                Изменения в релизной ветке:
+                ${tasks.eats-google-release-qa-build.output_params.values.branch_changelog}
+
+        qa-builds-finished: &qa-builds-finished
+          stage: test
+          title: QA Builds and Tests finished
+          task: dummy
+          needs:
+            - ai-test-failure-native-analyzer
+            - ai-test-failure-flex-analyzer
+            - report-debug-qa-builds-finished
+            - report-release-qa-builds-finished
+
+        start-builds: &start-builds
+          stage: build
+          title: Start builds for publishing
+          task: dummy
+          needs:
+            - qa-builds-finished
+            - eats-beta-deploy
+            - delivery-beta-deploy
+          needs-type: any-success
+          manual:
+            enabled: true
+            prompt: |
+
+              > 1. Убедись что тикет в RfRC и все ОКи собраны
+              > 2. Убедись что все тесты прошли
+
+        get-whats-new-update:
+          stage:  build
+          needs: start-builds
+          
+          title: Update "What's new"
+
+        update-eats-counter: &update-eats-counter
+          stage: build
+          needs: get-whats-new-update
+          title: Update Eats Counter
+          
+          input:
+            config:
+
+              counter_name: "mobile_infra_quota:eats/eats_android_release_counter"
+
+        eats-release-google-build: &eats-release-google-build
+          stage: build
+          needs: update-eats-counter
+          
+          title: Eats Google Release Build
+          input:
+            env:
+              FLAVOR: Google
+              BUILD_NUMBER: ${tasks.update-eats-counter.build_number.value}
+
+        eats-release-huawei-build: &eats-release-huawei-build
+          stage: build
+          needs: update-eats-counter
+          
+          title: Eats Huawei Release Build
+          input:
+            env:
+              FLAVOR: Huawei
+              BUILD_NUMBER: ${tasks.update-eats-counter.build_number.value}
+
+        eats-release-rustore-build: &eats-release-rustore-build
+          stage: build
+          needs: update-eats-counter
+          
+          title: Eats Rustore Release Build
+          input:
+            env:
+              FLAVOR: Rustore
+              BUILD_NUMBER: ${tasks.update-eats-counter.build_number.value}
+
+        eats-release-samsung-build: &eats-release-samsung-build
+          stage: build
+          needs: update-eats-counter
+          
+          title: Eats Samsung Release Build
+          input:
+            env:
+              FLAVOR: Samsung
+              BUILD_NUMBER: ${tasks.update-eats-counter.build_number.value}
+
+        update-delivery-counter: &update-delivery-counter
+          stage: build
+          needs: get-whats-new-update
+          title: Update Delivery Counter
+
+        delivery-release-google-build: &delivery-release-google-build
+          stage: build
+          needs: update-delivery-counter
+          
+          title: Delivery Google Release Build
+          input:
+            env:
+              FLAVOR: Google
+              BUILD_NUMBER: ${tasks.update-delivery-counter.build_number.value}
+
+        delivery-release-huawei-build: &delivery-release-huawei-build
+          stage: build
+          needs: update-delivery-counter
+          
+          title: Delivery Huawei Release Build
+          input:
+            env:
+              FLAVOR: Huawei
+              BUILD_NUMBER: ${tasks.update-delivery-counter.build_number.value}
+
+        delivery-release-rustore-build: &delivery-release-rustore-build
+          stage: build
+          needs: update-delivery-counter
+          
+          title: Delivery Rustore Release Build
+          input:
+            env:
+              FLAVOR: Rustore
+              BUILD_NUMBER: ${tasks.update-delivery-counter.build_number.value}
+
+        eats-release-xiaomi-build: &eats-release-xiaomi-build
+          stage: build
+          needs: update-eats-counter
+          
+          title: Eats Xiaomi Release Build
+          input:
+            env:
+              FLAVOR: Xiaomi
+              BUILD_NUMBER: ${tasks.update-eats-counter.build_number.value}
+            ci_badges:
+              - '{"module": "ANDROID", "text": "APK", "type":"artifact", "path":"apk/eats/build/outputs/apk/xiaomi/release/app-xiaomi-release.apk"}'
+
+        report-release-builds-finished: &report-release-builds-finished
+          stage: build
+          needs:
+            - eats-release-google-build
+            - eats-release-huawei-build
+            - eats-release-rustore-build
+            - eats-release-xiaomi-build
+            - eats-release-samsung-build
+            - delivery-release-google-build
+            - delivery-release-huawei-build
+            - delivery-release-rustore-build
+          
+          title: Report release builds finished
+          description: Отправка сообщения в JNS о завершении релизных сборок для сторов
+          input:
+            config:
+              jns_message: |
+                <a href="${context.ci_url}">${context.title}</a>
+
+                Сборки приложений для GooglePlay, RuStore, AppGallery готовы. Можно начинать раскатку.
+                - Еда - ${tasks.eats-release-google-build.output_params.values.version_name}
+                - Деливери - ${tasks.delivery-release-google-build.output_params.values.version_name}
+
+                Release notes для сторов: <a href="https://nda.ya.ru/t/nAgsfPb_7C4aPG">Источник what's new</a>
+                <pre>${tasks.get-whats-new-update.whats_new_ru || tasks.get-whats-new.whats_new_ru}</pre>
+                <pre>${tasks.get-whats-new-update.whats_new_en || tasks.get-whats-new.whats_new_en}</pre>
+
+                Сборки для сторов с ручной публикацией:
+                - <a href="${tasks.eats-release-xiaomi-build.output_params.artifacts_badge.url}/apk/eats/build/outputs/apk/xiaomi/release/app-xiaomi-release.apk">Xiaomi apk</a>
+
+        start-publishing: &start-publishing
+          stage: publish
+          title: Start publishing
+          task: dummy
+          needs: report-release-builds-finished
+
+        eats-release-googleplay: &eats-release-googleplay
+          stage: publish
+          
+          needs: start-publishing
+          title: Eats GooglePlay Release
+          input:
+            release_files:
+              resource_id: ${tasks.eats-release-google-build.resources[?type == 'TEAMCITY_ARTIFACTS'].id | single(@)}
+            app_id:
+              value: ${tasks.eats-release-google-build.output_params.values.app_id}
+            version:
+              value: ${tasks.eats-release-google-build.output_params.values.version}
+            version_name:
+              value: ${tasks.eats-release-google-build.output_params.values.version_name}
+
+        eats-googleplay-deploy-5:
+          stage: publish
+          
+          needs: eats-release-googleplay
+          title: Eats GooglePlay 5%
+
+        eats-googleplay-deploy-15:
+          stage: publish
+          
+          needs: eats-googleplay-deploy-5
+          title: Eats GooglePlay 15%
+
+        eats-googleplay-deploy-25: &eats-googleplay-deploy-25
+          stage: publish
+          
+          needs: eats-googleplay-deploy-15
+          title: Eats GooglePlay 25%
+
+        eats-googleplay-deploy-50: &eats-googleplay-deploy-50
+          stage: publish
+          
+          needs: eats-googleplay-deploy-25
+          title: Eats GooglePlay 50%
+
+        eats-googleplay-deploy-100: &eats-googleplay-deploy-100
+          stage: publish
+          
+          task: projects/taxi/mobile/infra/mmm/release-train/move/googleplay/production/completed
+          needs: eats-googleplay-deploy-50
+          title: Eats GooglePlay 100%
+
+        eats-release-appgallery: &eats-release-appgallery
+          stage: publish
+          
+          needs: start-publishing
+          title: Eats AppGallery Release
+          input:
+            release_files:
+              resource_id: ${tasks.eats-release-huawei-build.resources[?type == 'TEAMCITY_ARTIFACTS'].id | single(@)}
+            app_id:
+              value: ${tasks.eats-release-huawei-build.output_params.values.app_id}
+            version:
+              value: ${tasks.eats-release-huawei-build.output_params.values.version}
+
+        eats-appgallery-deploy-99: &eats-appgallery-deploy-99
+          stage: publish
+          
+          task: projects/taxi/mobile/infra/mmm/release-train/move/appgallery/partial
+          needs: eats-release-appgallery
+          title: Eats AppGallery 99%
+
+        eats-appgallery-skip-1: &eats-appgallery-skip-1
+          stage: publish
+          task: dummy
+          needs: eats-appgallery-deploy-99
+          title: ------------------------------>
+        eats-appgallery-skip-2: &eats-appgallery-skip-2
+          stage: publish
+          task: dummy
+          needs: eats-appgallery-skip-1
+          title: ------------------------------>
+        eats-appgallery-skip-3:
+          stage: publish
+          task: dummy
+          needs: eats-appgallery-skip-2
+          title: ------------------------------>
+
+        eats-appgallery-deploy-100: &eats-appgallery-deploy-100
+          stage: publish
+          
+          task: projects/taxi/mobile/infra/mmm/release-train/move/appgallery/completed
+          needs: eats-appgallery-skip-3
+          title: Eats AppGallery 100%
+
+        eats-release-rustore: &eats-release-rustore
+          stage: publish
+          
+          needs: start-publishing
+          title: Eats RuStore Release
+          input:
+            release_files:
+              resource_id: ${tasks.eats-release-rustore-build.resources[?type == 'TEAMCITY_ARTIFACTS'].id | single(@)}
+            app_id:
+              value: ${tasks.eats-release-rustore-build.output_params.values.app_id}
+            version:
+              value: ${tasks.eats-release-rustore-build.output_params.values.version}
+
+        eats-rustore-deploy-99: &eats-rustore-deploy-99
+          stage: publish
+          
+          task: projects/taxi/mobile/infra/mmm/release-train/move/rustore/partial
+          needs: eats-release-rustore
+
+          title: Eats RuStore 75%
+
+        eats-rustore-skip-1: &eats-rustore-skip-1
+          stage: publish
+          task: dummy
+          needs: eats-rustore-deploy-99
+          title: ------------------------------>
+        eats-rustore-skip-2: &eats-rustore-skip-2
+          stage: publish
+          task: dummy
+          needs: eats-rustore-skip-1
+          title: ------------------------------>
+        eats-rustore-skip-3:
+          stage: publish
+          task: dummy
+          needs: eats-rustore-skip-2
+          title: ------------------------------>
+
+        eats-rustore-deploy-100: &eats-rustore-deploy-100
+          stage: publish
+          
+          task: projects/taxi/mobile/infra/mmm/release-train/move/rustore/completed
+          needs: eats-rustore-skip-3
+          title: Eats RuStore 100%
+
+        eats-release-galaxystore: &eats-release-galaxystore
+          stage: publish
+          
+          needs: start-publishing
+          title: Eats GalaxyStore Release
+          input:
+            release_info:
+              store: SAMSUNG_GALAXY
+              appId: ${tasks.eats-release-samsung-build.output_params.values.app_id}
+              version: ${tasks.eats-release-samsung-build.output_params.values.version}
+              version_name: ${tasks.eats-release-samsung-build.output_params.values.version_name}
+            release_files:
+              resource_id: ${tasks.eats-release-samsung-build.resources[?type == 'TEAMCITY_ARTIFACTS'].id | single(@)}
+
+        eats-galaxystore-deploy-99: &eats-galaxystore-deploy-99
+          stage: publish
+          
+          needs: eats-release-galaxystore
+          title: Eats GalaxyStore 99%
+          input:
+            release_id:
+              value: ${tasks.eats-release-galaxystore.release_id.value}
+
+        eats-galaxystore-skip-1: &eats-galaxystore-skip-1
+          stage: publish
+          task: dummy
+          needs: eats-galaxystore-deploy-99
+          title: ------------------------------>
+        eats-galaxystore-skip-2: &eats-galaxystore-skip-2
+          stage: publish
+          task: dummy
+          needs: eats-galaxystore-skip-1
+          title: ------------------------------>
+        eats-galaxystore-skip-3:
+          stage: publish
+          task: dummy
+          needs: eats-galaxystore-skip-2
+          title: ------------------------------>
+
+        eats-galaxystore-deploy-100: &eats-galaxystore-deploy-100
+          stage: publish
+          
+          needs: eats-galaxystore-skip-3
+          title: Eats GalaxyStore 100%
+          input:
+            release_id:
+              value: ${tasks.eats-release-galaxystore.release_id.value}
+
+        delivery-release-googleplay: &delivery-release-googleplay
+          stage: publish
+          
+          needs: start-publishing
+          title: Delivery GooglePlay Release
+          input:
+            release_files:
+              resource_id: ${tasks.delivery-release-google-build.resources[?type == 'TEAMCITY_ARTIFACTS'].id | single(@)}
+            app_id:
+              value: ${tasks.delivery-release-google-build.output_params.values.app_id}
+            version:
+              value: ${tasks.delivery-release-google-build.output_params.values.version}
+            version_name:
+              value: ${tasks.delivery-release-google-build.output_params.values.version_name}
+
+        delivery-googleplay-deploy-5:
+          stage: publish
+          
+          needs: delivery-release-googleplay
+          title: Delivery GooglePlay 5%
+
+        delivery-googleplay-deploy-15:
+          stage: publish
+          
+          needs: delivery-googleplay-deploy-5
+          title: Delivery GooglePlay 15%
+
+        delivery-googleplay-deploy-25: &delivery-googleplay-deploy-25
+          stage: publish
+          
+          needs: delivery-googleplay-deploy-15
+          title: Delivery GooglePlay 25%
+
+        delivery-googleplay-deploy-50: &delivery-googleplay-deploy-50
+          stage: publish
+          
+          needs: delivery-googleplay-deploy-25
+          title: Delivery GooglePlay 50%
+
+        delivery-googleplay-deploy-100: &delivery-googleplay-deploy-100
+          stage: publish
+          
+          task: projects/taxi/mobile/infra/mmm/release-train/move/googleplay/production/completed
+          needs: delivery-googleplay-deploy-50
+          title: Delivery GooglePlay 100%
+
+        delivery-release-appgallery: &delivery-release-appgallery
+          stage: publish
+          
+          needs: start-publishing
+          title: Delivery AppGallery Release
+          input:
+            release_files:
+              resource_id: ${tasks.delivery-release-huawei-build.resources[?type == 'TEAMCITY_ARTIFACTS'].id | single(@)}
+            app_id:
+              value: ${tasks.delivery-release-huawei-build.output_params.values.app_id}
+            version:
+              value: ${tasks.delivery-release-huawei-build.output_params.values.version}
+
+        delivery-appgallery-deploy-99: &delivery-appgallery-deploy-99
+          stage: publish
+          
+          task: projects/taxi/mobile/infra/mmm/release-train/move/appgallery/partial
+          needs: delivery-release-appgallery
+          title: Delivery AppGallery 99%
+
+        delivery-appgallery-skip-1: &delivery-appgallery-skip-1
+          stage: publish
+          task: dummy
+          needs: delivery-appgallery-deploy-99
+          title: ------------------------------>
+        delivery-appgallery-skip-2: &delivery-appgallery-skip-2
+          stage: publish
+          task: dummy
+          needs: delivery-appgallery-skip-1
+          title: ------------------------------>
+        delivery-appgallery-skip-3: &delivery-appgallery-skip-3
+          stage: publish
+          task: dummy
+          needs: delivery-appgallery-skip-2
+          title: ------------------------------>
+
+        delivery-appgallery-deploy-100: &delivery-appgallery-deploy-100
+          stage: publish
+          
+          task: projects/taxi/mobile/infra/mmm/release-train/move/appgallery/completed
+          needs: delivery-appgallery-skip-3
+          title: Delivery AppGallery 100%
+
+        delivery-release-rustore: &delivery-release-rustore
+          stage: publish
+          
+          needs: start-publishing
+          title: Delivery RuStore Release
+          input:
+            release_files:
+              resource_id: ${tasks.delivery-release-rustore-build.resources[?type == 'TEAMCITY_ARTIFACTS'].id | single(@)}
+            app_id:
+              value: ${tasks.delivery-release-rustore-build.output_params.values.app_id}
+            version:
+              value: ${tasks.delivery-release-rustore-build.output_params.values.version}
+
+        delivery-rustore-deploy-99: &delivery-rustore-deploy-99
+          stage: publish
+          
+          task: projects/taxi/mobile/infra/mmm/release-train/move/rustore/partial
+          needs: delivery-release-rustore
+
+          title: Delivery RuStore 75%
+
+        delivery-rustore-skip-1: &delivery-rustore-skip-1
+          stage: publish
+          task: dummy
+          needs: delivery-rustore-deploy-99
+          title: ------------------------------>
+        delivery-rustore-skip-2: &delivery-rustore-skip-2
+          stage: publish
+          task: dummy
+          needs: delivery-rustore-skip-1
+          title: ------------------------------>
+        delivery-rustore-skip-3:
+          stage: publish
+          task: dummy
+          needs: delivery-rustore-skip-2
+          title: ------------------------------>
+
+        delivery-rustore-deploy-100: &delivery-rustore-deploy-100
+          stage: publish
+          
+          task: projects/taxi/mobile/infra/mmm/release-train/move/rustore/completed
+          needs: delivery-rustore-skip-3
+          title: Delivery RuStore 100%
+
+        report-publish-5: &report-publish-5
+          stage: publish
+          
+          needs:
+            - eats-googleplay-deploy-5
+            - eats-appgallery-deploy-99
+            - eats-rustore-deploy-99
+            - delivery-googleplay-deploy-5
+            - delivery-appgallery-deploy-99
+            - delivery-rustore-deploy-99
+          title: Report publish status
+          description: Отправка сообщения в JNS о статусе публикации
+          input:
+            config:
+              jns_message: |
+                <a href="${context.ci_url}">${context.title}</a>
+
+                Статус публикации: отправлено на ревью с последующей публикацией
+
+                <b>Еда и Деливери</b>
+                Google Play: 5%
+                RuStore: 75%
+                AppGallery: 99%
+
+                <blockquote>
+                ❗ После прохождения ревью в Google Play нужно будет подтвердить публикацию в консоли.
+                </blockquote>
+
+        report-publish-15: &report-publish-15
+          stage: publish
+          
+          needs:
+            - report-publish-5
+            - eats-googleplay-deploy-15
+            - eats-appgallery-skip-1
+            - eats-rustore-skip-1
+            - delivery-googleplay-deploy-15
+            - delivery-appgallery-skip-1
+            - delivery-rustore-skip-1
+          title: Report publish status
+          description: Отправка сообщения в JNS о статусе публикации
+          input:
+            config:
+              jns_message: |
+                <a href="${context.ci_url}">${context.title}</a>
+
+                Статус публикации:
+                <b>Еда и Деливери</b>
+                Google Play: 15%
+                RuStore: 75%
+                AppGallery: 99%
+
+        report-publish-25: &report-publish-25
+          stage: publish
+          
+          needs:
+            - report-publish-15
+            - eats-googleplay-deploy-25
+            - eats-appgallery-skip-2
+            - eats-rustore-skip-2
+            - delivery-googleplay-deploy-25
+            - delivery-appgallery-skip-2
+            - delivery-rustore-skip-2
+          title: Report publish status
+          description: Отправка сообщения в JNS о статусе публикации
+          input:
+            config:
+              jns_message: |
+                <a href="${context.ci_url}">${context.title}</a>
+
+                Статус публикации:
+
+                <b>Еда и Деливери</b>
+                Google Play: 25%
+                RuStore: 75%
+                AppGallery: 99%
+
+        report-publish-50: &report-publish-50
+          stage: publish
+          
+          needs:
+            - report-publish-25
+            - eats-googleplay-deploy-50
+            - eats-appgallery-skip-3
+            - eats-rustore-skip-3
+            - delivery-googleplay-deploy-50
+            - delivery-appgallery-skip-3
+            - delivery-rustore-skip-3
+          title: Report publish status
+          description: Отправка сообщения в JNS о статусе публикации
+          input:
+            config:
+              jns_message: |
+                <a href="${context.ci_url}">${context.title}</a>
+
+                Статус публикации:
+
+                <b>Еда и Деливери</b>
+                Google Play: 50%
+                RuStore: 75%
+                AppGallery: 99%
+
+        report-publish-100: &report-publish-100
+          stage: publish
+          
+          needs:
+            - report-publish-50
+            - eats-googleplay-deploy-100
+            - eats-appgallery-deploy-100
+            - eats-rustore-deploy-100
+            - eats-galaxystore-deploy-100
+            - delivery-googleplay-deploy-100
+            - delivery-appgallery-deploy-100
+            - delivery-rustore-deploy-100
+          title: Report publish status
+          description: Отправка сообщения в JNS о статусе публикации
+          input:
+            config:
+              jns_message: |
+                <a href="${context.ci_url}">${context.title}</a>
+
+                Статус публикации:
+
+                <b>Еда и Деливери</b>
+                Google Play: 100%
+                RuStore: 100%
+                AppGallery: 100%
+
+        eats-stop-publishing: &eats-stop-publishing
+          stage: publish
+          needs:
+            - eats-googleplay-deploy-5
+            - eats-appgallery-deploy-99
+            - eats-rustore-deploy-99
+            - eats-galaxystore-deploy-99
+          title: Eats STOP publishing
+          task: dummy
+          manual:
+            enabled: true
+            prompt: |
+
+              > ❗ В RuStore и AppGallery при остановке публикации релиз не отменяется.
+              >  Перед тем как публиковать следующий релиз нужно будет вручную в консоли отменить текущий релиз.
+              >  https://nda.ya.ru/t/fbO-dUaw7CUAK5
+
+        eats-googleplay-deploy-stop: &eats-googleplay-deploy-stop
+          stage: publish
+          task: projects/taxi/mobile/infra/mmm/release-train/move/googleplay/production/halted
+          needs: eats-stop-publishing
+          title: Eats GooglePlay STOP
+
+        eats-appgallery-deploy-stop: &eats-appgallery-deploy-stop
+          stage: publish
+          task: projects/taxi/mobile/infra/mmm/release-train/move/appgallery/halted
+          needs: eats-stop-publishing
+          title: Eats AppGallery STOP
+
+        eats-rustore-deploy-stop: &eats-rustore-deploy-stop
+          stage: publish
+          task: projects/taxi/mobile/infra/mmm/release-train/move/rustore/halted
+          needs: eats-stop-publishing
+          title: Eats RuStore STOP
+
+        eats-galaxystore-deploy-stop: &eats-galaxystore-deploy-stop
+          stage: publish
+          
+          needs: eats-stop-publishing
+          title: Eats GalaxyStore STOP
+          input:
+            release_id:
+              value: ${tasks.eats-release-galaxystore.release_id.value}
+
+        delivery-stop-publishing: &delivery-stop-publishing
+          stage: publish
+          needs:
+            - delivery-googleplay-deploy-5
+            - delivery-appgallery-deploy-99
+            - delivery-rustore-deploy-99
+          title: Delivery STOP publishing
+          task: dummy
+          manual:
+            enabled: true
+            prompt: |
+
+              > ❗ В RuStore и AppGallery при остановке публикации релиз не отменяется.
+              >  Перед тем как публиковать следующий релиз нужно будет вручную в консоли отменить текущий релиз.
+              >  https://nda.ya.ru/t/fbO-dUaw7CUAK5
+
+        delivery-googleplay-deploy-stop: &delivery-googleplay-deploy-stop
+          stage: publish
+          task: projects/taxi/mobile/infra/mmm/release-train/move/googleplay/production/halted
+          needs: delivery-stop-publishing
+          title: Delivery GooglePlay STOP
+
+        delivery-appgallery-deploy-stop: &delivery-appgallery-deploy-stop
+          stage: publish
+          task: projects/taxi/mobile/infra/mmm/release-train/move/appgallery/halted
+          needs: delivery-stop-publishing
+          title: Delivery AppGallery STOP
+
+        delivery-rustore-deploy-stop: &delivery-rustore-deploy-stop
+          stage: publish
+          task: projects/taxi/mobile/infra/mmm/release-train/move/rustore/halted
+          needs: delivery-stop-publishing
+          title: Delivery RuStore STOP
+
+        publishing-stopped: &publishing-stopped
+          stage: publish
+          needs:
+            - eats-googleplay-deploy-stop
+            - eats-appgallery-deploy-stop
+            - eats-rustore-deploy-stop
+            - eats-galaxystore-deploy-stop
+            - delivery-googleplay-deploy-stop
+            - delivery-appgallery-deploy-stop
+            - delivery-rustore-deploy-stop
+          
+          title: Publishing stopped
+          description: Отправка сообщения в JNS об остановке публикации приложений
+          input:
+            config:
+              jns_message: |
+                <a href="${context.ci_url}">${context.title}</a>
+
+                Публикация приложений остановлена.
+                <blockquote>
+                ❗ В RuStore и AppGallery при остановке публикации релиз не отменяется.
+                Перед тем как публиковать следующий релиз нужно будет вручную в консоли отменить текущий релиз.
+                https://nda.ya.ru/t/fbO-dUaw7CUAK5
+                </blockquote>
+
+        publishing-finished: &publishing-finished
+          stage: publish
+          needs:
+            - report-publish-100
+            - publishing-stopped
+          needs-type: any-success
+          title: Publishing finished
+          description: Финальный кубик стадии публикации
+          task: dummy
+
+        finish-release: &finish-release
+          stage: finish
+          needs: publishing-finished
+          title: Release finished
+          description: Завершение релиза. Закрытие тикетов
+          task: common/tracker/transit_issue
+          input:
+            issue: ${tasks.find-release-ticket.issue}
+            config:
+              link:
+                ignore_commits: true
+            transition:
+              status: Закрыт
+              resolution: Решен
+            update_template:
+              comment: |
+                [${context.title}](${context.ci_url}) закрыт в ${date_format(context.job_started_at, 'dd.MM.yyyy HH:mm', 'Europe/Moscow')}
+              link_source: FROM_ISSUE
+              linked:
+                comment: |
+                  Выехал в [${context.title}](${context.ci_url}) в ${date_format(context.job_started_at, 'dd.MM.yyyy HH:mm', 'Europe/Moscow')}
+                  Релизный тикет ${tasks.find-release-ticket.issue.issue}
+                transition:
+                  status: Закрыт
+                  resolution: Решен
+                filter: '"Fix Version": AndroidClient_${tasks.start-preparing.values.current_version_full}'
+
+        report-finish-release: &report-finish-release
+          stage: finish
+          needs: finish-release
+          
+          title: Report finish release
+          input:
+            config:
+              jns_message: |
+                <a href="${context.ci_url}">${context.title}</a> завершен.
+                <a href="https://st.yandex-team.ru/${tasks.find-release-ticket.issue.issue}">Релизный тикет</a> закрыт.
+
+    hotfix-flow:
+      title: Hotfix flow
+      jobs:
+
+        start-preparing:
+          stage: prepare
+          title: Prepare release
+          description: Подготовка данных для релиза
+          input:
+            exec:
+              mode: EXEC_MODE_FAIL_FAST
+              commands:
+                - shell:
+                    script: |
+                      python3 ./ci/scripts/release-parse-versions.py \
+                      -app-type eatsVersion \
+                      -is-hotfix true \
+                      > $CI_RESULTS_FILE
+
+        get-whats-new:
+          <<: *get-whats-new
+
+        find-release-ticket:
+          stage: prepare
+          needs: start-preparing
+          title: Create release ticket
+          task: common/tracker/create_issue
+          input:
+            config:
+              link:
+                ignore_commits: true
+            rules:
+
+              on_duplicate: FAIL
+            template:
+              queue: EDAFRONT
+              type: Релиз
+              summary: Release Eats AndroidClient_${tasks.start-preparing.values.next_version_full}
+              description: |
+                **Релиз в Arcadia CI:**
+                [Release Flow](https://a.yandex-team.ru/projects/yeats_android_development_team/ci/releases/flow?dir=taxi%2Fmobile%2Feats%2Fandroid_client&id=release-apps&version=${tasks.start-preparing.values.next_version_full})
+
+                **Сборки в Бета:**
+                - [QA Debug Еда](https://beta.m.soft.yandex.ru/description?app=eda&platform_shortcut=android&branch=release_AndroidClient_${tasks.start-preparing.values.next_version_beta}_Debug_Google)
+                - [QA Release Еда](https://beta.m.soft.yandex.ru/description?app=eda&platform_shortcut=android&branch=release_AndroidClient_${tasks.start-preparing.values.next_version_beta}_Release_Google)
+                - [QA Debug Деливери](https://beta.m.soft.yandex.ru/description?app=MarketDelivery&platform_shortcut=android&branch=release_AndroidClient_${tasks.start-preparing.values.next_version_beta}_Debug_Google)
+                - [QA Release Деливери](https://beta.m.soft.yandex.ru/description?app=MarketDelivery&platform_shortcut=android&branch=release_AndroidClient_${tasks.start-preparing.values.next_version_beta}_Release_Google)
+
+                ---
+                **Задачи в релизе:**
+
+              components: [AndroidClient]
+              fix_version: AndroidClient_${tasks.start-preparing.values.next_version_full}
+
+        start-release-ticket:
+          <<: *start-release-ticket
+
+        create-update-version-pr:
+          stage: prepare
+          needs: find-release-ticket
+          title: Create bump patch version PR
+          task: projects/eats/eats_increase_app_version
+          input:
+            config:
+              project: android
+              increaseType: PATCH
+              branch: ${context.branch}
+              linkIssue: ${tasks.find-release-ticket.issue.issue}
+              forceMerge: true
+              appVersions: [eatsVersion]
+
+        report-release-started:
+          stage: prepare
+          needs:
+            - create-update-version-pr
+            - start-release-ticket
+          
+          title: Report release started
+          description: Отправка сообщения о начале релиза в JNS
+          input:
+            config:
+              jns_message: |
+                Запущен <a href="${context.ci_url}">${context.title}</a> в ${date_format(context.flow_started_at, 'dd.MM.yyyy HH:mm', 'Europe/Moscow')}
+
+                <a href="https://nda.ya.ru/t/4NJYMwql7Hd77H">Инструкция дежурного по релизу</a>
+
+                <a href="https://st.yandex-team.ru/${tasks.find-release-ticket.issue.issue}">Релизный тикет</a> создан и взят в работу.
+
+                Release notes для стора: <a href="https://nda.ya.ru/t/nAgsfPb_7C4aPG">Источник what's new</a>
+                <pre>${tasks.get-whats-new.whats_new_ru}</pre>
+                <pre>${tasks.get-whats-new.whats_new_en}</pre>
+
+                ${tasks.create-update-version-pr.report.response}
+
+        start-testing:
+          <<: *start-testing
+
+        start-regress-builds:
+          <<: *start-regress-builds
+
+        build-ui-tests:
+          <<: *build-ui-tests
+
+        prepare-test-lists:
+          <<: *prepare-test-lists
+
+        run-ui-tests-shard-1:
+          <<: *run-ui-tests-shard-1
+
+        run-ui-tests-shard-2:
+          <<: *run-ui-tests-shard-2
+
+        run-ui-tests-shard-3:
+          <<: *run-ui-tests-shard-3
+
+        run-ui-tests-flex:
+          <<: *run-ui-tests-flex
+
+        merge-allure-results:
+          <<: *merge-allure-results
+
+        merge-flex-allure-results:
+          <<: *merge-flex-allure-results
+
+        ai-test-failure-native-analyzer:
+          <<: *ai-test-failure-native-analyzer
+
+        ai-test-failure-flex-analyzer:
+          <<: *ai-test-failure-flex-analyzer
+
+        eats-google-debug-qa-build:
+          <<: *eats-google-debug-qa-build
+
+        eats-google-release-qa-build:
+          <<: *eats-google-release-qa-build
+
+        delivery-google-debug-qa-build:
+          <<: *delivery-google-debug-qa-build
+
+        delivery-google-release-qa-build:
+          <<: *delivery-google-release-qa-build
+
+        report-debug-qa-builds-finished:
+          <<: *report-debug-qa-builds-finished
+
+        report-release-qa-builds-finished:
+          <<: *report-release-qa-builds-finished
+
+        qa-builds-finished:
+          <<: *qa-builds-finished
+
+        start-builds:
+          <<: *start-builds
+          needs: qa-builds-finished
+
+        update-eats-counter:
+          <<: *update-eats-counter
+          needs: start-builds
+
+        eats-release-google-build:
+          <<: *eats-release-google-build
+
+        eats-release-huawei-build:
+          <<: *eats-release-huawei-build
+
+        eats-release-rustore-build:
+          <<: *eats-release-rustore-build
+
+        eats-release-samsung-build:
+          <<: *eats-release-samsung-build
+
+        update-delivery-counter:
+          <<: *update-delivery-counter
+          needs: start-builds
+
+        delivery-release-google-build:
+          <<: *delivery-release-google-build
+
+        delivery-release-huawei-build:
+          <<: *delivery-release-huawei-build
+
+        delivery-release-rustore-build:
+          <<: *delivery-release-rustore-build
+
+        eats-release-xiaomi-build:
+          <<: *eats-release-xiaomi-build
+
+        report-release-builds-finished:
+          <<: *report-release-builds-finished
+
+        start-publishing:
+          <<: *start-publishing
+
+        eats-release-googleplay:
+          <<: *eats-release-googleplay
+
+        eats-googleplay-deploy-10:
+          stage: publish
+          
+          needs: eats-release-googleplay
+          title: Eats GooglePlay 10%
+
+        eats-googleplay-deploy-25:
+          <<: *eats-googleplay-deploy-25
+          needs: eats-googleplay-deploy-10
+
+        eats-googleplay-deploy-50:
+          <<: *eats-googleplay-deploy-50
+
+        eats-googleplay-deploy-100:
+          <<: *eats-googleplay-deploy-100
+
+        eats-release-appgallery:
+          <<: *eats-release-appgallery
+
+        eats-appgallery-deploy-99:
+          <<: *eats-appgallery-deploy-99
+
+        eats-appgallery-skip-1:
+          <<: *eats-appgallery-skip-1
+
+        eats-appgallery-skip-2:
+          <<: *eats-appgallery-skip-2
+
+        eats-appgallery-deploy-100:
+          <<: *eats-appgallery-deploy-100
+          needs: eats-appgallery-skip-2
+
+        eats-release-rustore:
+          <<: *eats-release-rustore
+
+        eats-rustore-deploy-99:
+          <<: *eats-rustore-deploy-99
+
+        eats-rustore-skip-1:
+          <<: *eats-rustore-skip-1
+
+        eats-rustore-skip-2:
+          <<: *eats-rustore-skip-2
+
+        eats-rustore-deploy-100:
+          <<: *eats-rustore-deploy-100
+          needs: eats-rustore-skip-2
+
+        eats-release-galaxystore:
+          <<: *eats-release-galaxystore
+
+        eats-galaxystore-deploy-99:
+          <<: *eats-galaxystore-deploy-99
+
+        eats-galaxystore-skip-1:
+          <<: *eats-galaxystore-skip-1
+
+        eats-galaxystore-skip-2:
+          <<: *eats-galaxystore-skip-2
+
+        eats-galaxystore-deploy-100:
+          <<: *eats-galaxystore-deploy-100
+          needs: eats-galaxystore-skip-2
+
+        delivery-release-googleplay:
+          <<: *delivery-release-googleplay
+
+        delivery-googleplay-deploy-10:
+          stage: publish
+          
+          needs: delivery-release-googleplay
+          title: Delivery GooglePlay 10%
+
+        delivery-googleplay-deploy-25:
+          <<: *delivery-googleplay-deploy-25
+          needs: delivery-googleplay-deploy-10
+
+        delivery-googleplay-deploy-50:
+          <<: *delivery-googleplay-deploy-50
+
+        delivery-googleplay-deploy-100:
+          <<: *delivery-googleplay-deploy-100
+
+        delivery-release-appgallery:
+          <<: *delivery-release-appgallery
+
+        delivery-appgallery-deploy-99:
+          <<: *delivery-appgallery-deploy-99
+
+        delivery-appgallery-skip-1:
+          <<: *delivery-appgallery-skip-1
+
+        delivery-appgallery-skip-2:
+          <<: *delivery-appgallery-skip-2
+
+        delivery-appgallery-deploy-100:
+          <<: *delivery-appgallery-deploy-100
+          needs: delivery-appgallery-skip-2
+
+        delivery-release-rustore:
+          <<: *delivery-release-rustore
+
+        delivery-rustore-deploy-99:
+          <<: *delivery-rustore-deploy-99
+
+        delivery-rustore-skip-1:
+          <<: *delivery-rustore-skip-1
+
+        delivery-rustore-skip-2:
+          <<: *delivery-rustore-skip-2
+
+        delivery-rustore-deploy-100:
+          <<: *delivery-rustore-deploy-100
+          needs: delivery-rustore-skip-2
+
+        report-publish-10: &report-publish-10
+          stage: publish
+          
+          needs:
+            - eats-googleplay-deploy-10
+            - eats-appgallery-deploy-99
+            - eats-rustore-deploy-99
+            - delivery-googleplay-deploy-10
+            - delivery-appgallery-deploy-99
+            - delivery-rustore-deploy-99
+          title: Report publish status
+          description: Отправка сообщения в JNS о статусе публикации
+          input:
+            config:
+              jns_message: |
+                <a href="${context.ci_url}">${context.title}</a>
+
+                Статус публикации: отправлено на ревью с последующей публикацией
+
+                <b>Еда и Деливери</b>
+                Google Play: 10%
+                RuStore: 75%
+                AppGallery: 99%
+
+                <blockquote>
+                ❗ После прохождения ревью в Google Play нужно будет подтвердить публикацию в консоли.
+                </blockquote>
+
+        report-publish-25:
+          <<: *report-publish-25
+          needs:
+            - report-publish-10
+            - eats-googleplay-deploy-25
+            - eats-appgallery-skip-1
+            - eats-rustore-skip-1
+            - delivery-googleplay-deploy-25
+            - delivery-appgallery-skip-1
+            - delivery-rustore-skip-1
+
+        report-publish-50:
+          <<: *report-publish-50
+          needs:
+            - report-publish-25
+            - eats-googleplay-deploy-50
+            - eats-appgallery-skip-2
+            - eats-rustore-skip-2
+            - delivery-googleplay-deploy-50
+            - delivery-appgallery-skip-2
+            - delivery-rustore-skip-2
+
+        report-publish-100:
+          <<: *report-publish-100
+
+        eats-stop-publishing:
+          <<: *eats-stop-publishing
+          needs:
+            - eats-googleplay-deploy-10
+            - eats-appgallery-deploy-99
+            - eats-rustore-deploy-99
+
+        eats-googleplay-deploy-stop:
+          <<: *eats-googleplay-deploy-stop
+
+        eats-appgallery-deploy-stop:
+          <<: *eats-appgallery-deploy-stop
+
+        eats-rustore-deploy-stop:
+          <<: *eats-rustore-deploy-stop
+
+        eats-galaxystore-deploy-stop:
+          <<: *eats-galaxystore-deploy-stop
+
+        delivery-stop-publishing:
+          <<: *delivery-stop-publishing
+          needs:
+            - delivery-googleplay-deploy-10
+            - delivery-appgallery-deploy-99
+            - delivery-rustore-deploy-99
+
+        delivery-googleplay-deploy-stop:
+          <<: *delivery-googleplay-deploy-stop
+
+        delivery-appgallery-deploy-stop:
+          <<: *delivery-appgallery-deploy-stop
+
+        delivery-rustore-deploy-stop:
+          <<: *delivery-rustore-deploy-stop
+
+        publishing-stopped:
+          <<: *publishing-stopped
+
+        publishing-finished:
+          <<: *publishing-finished
+
+        finish-release:
+          <<: *finish-release
+
+        report-finish-release:
+          <<: *report-finish-release
