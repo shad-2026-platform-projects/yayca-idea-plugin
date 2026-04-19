@@ -23,12 +23,19 @@ class PlantUmlPreviewEditor(
     private val file: VirtualFile
 ) : UserDataHolderBase(), FileEditor {
 
+    companion object {
+        private const val EDITOR_NAME = "Preview"
+        private const val NO_DOCUMENT_ERROR = "Document is null for file"
+        private const val IMAGE_PADDING = 16
+        private const val SCROLL_STEP = 16
+    }
+
     private val panel = JPanel(BorderLayout())
 
     private val imageLabel = JLabel().apply {
         horizontalAlignment = JLabel.CENTER
         verticalAlignment = JLabel.CENTER
-        border = JBUI.Borders.empty(16)
+        border = JBUI.Borders.empty(IMAGE_PADDING)
         isOpaque = false
     }
 
@@ -40,13 +47,13 @@ class PlantUmlPreviewEditor(
     private val scrollPane = JScrollPane(centerPanel).apply {
         border = null
         viewport.border = null
-        horizontalScrollBar.unitIncrement = 16
-        verticalScrollBar.unitIncrement = 16
+        horizontalScrollBar.unitIncrement = SCROLL_STEP
+        verticalScrollBar.unitIncrement = SCROLL_STEP
     }
 
     private val document =
         FileDocumentManager.getInstance().getDocument(file)
-            ?: error("No document")
+            ?: throw IllegalStateException("$NO_DOCUMENT_ERROR: $file")
 
     private val renderService = RenderService(
         onSuccess = { updateImage(it) },
@@ -87,7 +94,7 @@ class PlantUmlPreviewEditor(
 
     override fun getPreferredFocusedComponent(): JComponent? = null
 
-    override fun getName(): String = "Preview"
+    override fun getName(): String = EDITOR_NAME
 
     override fun setState(state: FileEditorState) {}
 

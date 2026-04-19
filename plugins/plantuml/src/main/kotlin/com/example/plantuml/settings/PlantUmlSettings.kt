@@ -12,7 +12,7 @@ import com.intellij.util.xmlb.XmlSerializerUtil
 class PlantUmlSettings : PersistentStateComponent<PlantUmlSettings> {
 
     var maxInputSize: Int = 100_000
-    var timeoutMs: Long = 3000L
+    var timeoutMs: Long = 10000L
 
     override fun getState(): PlantUmlSettings = this
 
